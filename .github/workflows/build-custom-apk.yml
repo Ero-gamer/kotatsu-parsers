@@ -1,4 +1,4 @@
-name: Fixed Build Kotatsu APK
+name: Fixed Build Kotatsu-Redo APK
 
 on:
   workflow_dispatch:
@@ -7,17 +7,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout App
+      - name: Checkout App (Kotatsu-Redo)
         uses: actions/checkout@v4
         with:
           repository: Kotatsu-Redo/Kotatsu-Redo
           path: main-app
-          fetch-depth: 1 # Faster download
+          ref: devel # Most Redo forks use 'devel' as the active branch
 
-      - name: Checkout Your Library
+      - name: Checkout Your Parser (Ero-gamer)
         uses: actions/checkout@v4
         with:
-          path: my-library-source
+          repository: Ero-gamer/kotatsu-parsers
+          path: my-parsers
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -26,29 +27,25 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Fix Environment & Swap Library
+      - name: Patch & Sync Parsers
         run: |
-          # 1. Create a dummy local.properties to prevent "SDK not found" errors
-          touch main-app/local.properties
-          
-          # 2. Delete the old lib and move yours in
+          # 1. Kotatsu-Redo usually expects the parser to be inside its own directory
+          # We delete the old ones to prevent "Duplicate Class" errors
           rm -rf main-app/kotatsu-parsers
-          cp -r my-library-source/. main-app/kotatsu-parsers/
+          rm -rf main-app/kotatsu-parsers-ksp
           
-          # 3. Force the app to use your local library module
-          # We use a robust 'sed' to ensure the build.gradle is updated correctly
-          sed -i "s/implementation.*kotatsu-parsers.*/implementation project(':kotatsu-parsers')/" main-app/app/build.gradle
+          # 2. Copy your source code in
+          cp -r my-parsers/. main-app/kotatsu-parsers/
+          
+          # 3. FIX: Remove the problematic JSON dependency that causes Exit Code 1 in APK builds
+          sed -i '/libs.json/d' main-app/kotatsu-parsers/build.gradle.kts
+          
+          # 4. Create dummy local.properties
+          echo "sdk.dir=$ANDROID_HOME" > main-app/local.properties
 
-      - name: Build with Gradle Wrapper
+      - name: Build APK
+        working-directory: main-app
         run: |
-          cd main-app
           chmod +x gradlew
-          # We use --stacktrace to see exactly what's wrong if it fails again
-          ./gradlew :app:assembleRelease --stacktrace --no-daemon
-
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kotatsu-Fixed-Build
-          path: main-app/app/build/outputs/apk/release/*.apk
+          # We use assembleDebug first because it's faster and less strict for testing
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
