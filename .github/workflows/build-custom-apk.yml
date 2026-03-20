@@ -1,7 +1,7 @@
 name: Build Custom Kotatsu APK
 
 on:
-  workflow_dispatch: # Allows you to click a button to start the build
+  workflow_dispatch: # Manual trigger from the Actions tab
 
 jobs:
   build:
@@ -14,13 +14,13 @@ jobs:
           repository: Kotatsu-Redo/Kotatsu-Redo
           path: main-app
 
-      # 2. Get YOUR Library Code (this repo)
-      - name: Checkout Your Library
+      # 2. Get YOUR Library Code (the fork you are in)
+      - name: Checkout Your Library Fork
         uses: actions/checkout@v4
         with:
-          path: kotatsu-parsers
+          path: my-library-source
 
-      # 3. Prepare Environment
+      # 3. Set up Java
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -28,26 +28,30 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      # 4. Link your library to the App
-      # This part tells the app to use your local folder instead of the internet version
-      - name: Patch Project
+      # 4. Swap the App's library with Your Library
+      - name: Replace Library Source
         run: |
+          # Remove the existing library folder in the app repo
+          rm -rf main-app/kotatsu-parsers
+          
+          # Move your forked code into that exact spot
+          cp -r my-library-source/. main-app/kotatsu-parsers/
+          
+          # Ensure the app's settings.gradle recognizes the module
+          # (Usually Kotatsu already has this, but this ensures it's correct)
           cd main-app
-          echo "include ':app', ':kotatsu-parsers'" > settings.gradle
-          echo "project(':kotatsu-parsers').projectDir = new File('../kotatsu-parsers')" >> settings.gradle
-          # Update the app's build file to use the local module
           sed -i "s/implementation.*kotatsu-parsers.*/implementation project(':kotatsu-parsers')/" app/build.gradle
 
-      # 5. Build the APK
+      # 5. Build the Release APK
       - name: Build Release APK
         run: |
           cd main-app
           chmod +x gradlew
           ./gradlew :app:assembleRelease
 
-      # 6. Upload the result
+      # 6. Upload the finished APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kotatsu-Custom-Build
+          name: Kotatsu-Redo-Custom
           path: main-app/app/build/outputs/apk/release/*.apk
