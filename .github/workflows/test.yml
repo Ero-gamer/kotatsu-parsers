@@ -26,29 +26,32 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Patch & Sync Parsers
+      - name: Prepare Workspace & Sync Library
         run: |
-          # 1. Clear old lib and move yours in
+          # 1. Clear existing parsers in the app repo
           rm -rf main-app/kotatsu-parsers
+          
+          # 2. Inject your forked source
           cp -r my-parsers/. main-app/kotatsu-parsers/
           
-          # 2. Fix JSON conflict from your build.gradle.kts
+          # 3. Strip problematic dependencies from your Kotlin script
+          # This prevents "Duplicate Class" errors during dexing
           sed -i '/libs.json/d' main-app/kotatsu-parsers/build.gradle.kts
+          sed -i '/libs.okhttp/d' main-app/kotatsu-parsers/build.gradle.kts
           
-          # 3. Create dummy local.properties
+          # 4. Create dummy local.properties for the Android SDK
           echo "sdk.dir=$ANDROID_HOME" > main-app/local.properties
 
-      - name: Build APK
+      - name: Build Unsigned Release APK
         working-directory: main-app
         run: |
           chmod +x gradlew
-          # Building Debug first as it's most compatible for testing
-          ./gradlew :app:assembleDebug --no-daemon
+          # We use assembleRelease but tell Gradle NOT to fail if signing is missing
+          ./gradlew :app:assembleRelease -Pandroid.injected.signing.config.file=none --no-daemon
 
-      - name: Upload APK
+      - name: Upload Unsigned APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kotatsu-Custom-App
-          # Using wildcard ** to find the APK no matter where Gradle put it
-          path: main-app/app/build/outputs/apk/**/*.apk
-          if-no-files-found: error # This will make the job FAIL if no APK is found
+          name: Kotatsu-Unsigned-Release
+          path: main-app/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
