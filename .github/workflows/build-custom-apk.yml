@@ -1,0 +1,53 @@
+name: Build Custom Kotatsu APK
+
+on:
+  workflow_dispatch: # Allows you to click a button to start the build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Get the Main App Code
+      - name: Checkout App Repo
+        uses: actions/checkout@v4
+        with:
+          repository: Kotatsu-Redo/Kotatsu-Redo
+          path: main-app
+
+      # 2. Get YOUR Library Code (this repo)
+      - name: Checkout Your Library
+        uses: actions/checkout@v4
+        with:
+          path: kotatsu-parsers
+
+      # 3. Prepare Environment
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # 4. Link your library to the App
+      # This part tells the app to use your local folder instead of the internet version
+      - name: Patch Project
+        run: |
+          cd main-app
+          echo "include ':app', ':kotatsu-parsers'" > settings.gradle
+          echo "project(':kotatsu-parsers').projectDir = new File('../kotatsu-parsers')" >> settings.gradle
+          # Update the app's build file to use the local module
+          sed -i "s/implementation.*kotatsu-parsers.*/implementation project(':kotatsu-parsers')/" app/build.gradle
+
+      # 5. Build the APK
+      - name: Build Release APK
+        run: |
+          cd main-app
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease
+
+      # 6. Upload the result
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kotatsu-Custom-Build
+          path: main-app/app/build/outputs/apk/release/*.apk
