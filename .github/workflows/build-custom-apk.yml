@@ -1,4 +1,4 @@
-name: Fixed Build Kotatsu-Redo APK
+name: Build
 
 on:
   workflow_dispatch:
@@ -12,12 +12,11 @@ jobs:
         with:
           repository: Kotatsu-Redo/Kotatsu-Redo
           path: main-app
-          ref: devel # Most Redo forks use 'devel' as the active branch
+          ref: devel
 
       - name: Checkout Your Parser (Ero-gamer)
         uses: actions/checkout@v4
         with:
-          repository: Ero-gamer/kotatsu-parsers
           path: my-parsers
 
       - name: Set up JDK 17
@@ -29,23 +28,27 @@ jobs:
 
       - name: Patch & Sync Parsers
         run: |
-          # 1. Kotatsu-Redo usually expects the parser to be inside its own directory
-          # We delete the old ones to prevent "Duplicate Class" errors
+          # 1. Clear old lib and move yours in
           rm -rf main-app/kotatsu-parsers
-          rm -rf main-app/kotatsu-parsers-ksp
-          
-          # 2. Copy your source code in
           cp -r my-parsers/. main-app/kotatsu-parsers/
           
-          # 3. FIX: Remove the problematic JSON dependency that causes Exit Code 1 in APK builds
+          # 2. Fix JSON conflict from your build.gradle.kts
           sed -i '/libs.json/d' main-app/kotatsu-parsers/build.gradle.kts
           
-          # 4. Create dummy local.properties
+          # 3. Create dummy local.properties
           echo "sdk.dir=$ANDROID_HOME" > main-app/local.properties
 
       - name: Build APK
         working-directory: main-app
         run: |
           chmod +x gradlew
-          # We use assembleDebug first because it's faster and less strict for testing
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          # Building Debug first as it's most compatible for testing
+          ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kotatsu-Custom-App
+          # Using wildcard ** to find the APK no matter where Gradle put it
+          path: main-app/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error # This will make the job FAIL if no APK is found
