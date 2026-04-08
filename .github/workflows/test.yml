@@ -63,7 +63,7 @@ jobs:
           ./gradlew :app:assembleRelease -Pandroid.injected.signing.config.file=none --no-daemon
 
       - name: Upload Unsigned APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Kotatsu-Unsigned-Release
           path: main-app/app/build/outputs/apk/release/*.apk
