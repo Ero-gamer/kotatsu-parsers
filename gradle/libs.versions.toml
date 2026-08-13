@@ -12,7 +12,7 @@ okio = "3.16.4"
 
 # Parsing & Scripting (Performance Optimized)
 json = "20251224"
-jsoup = "1.22.1"
+jsoup = "1.23.1"
 quickjs = "1.1.0"
 korte = "4.0.10"
 simplexml = "2.7.1"
